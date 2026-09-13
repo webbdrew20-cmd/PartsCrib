@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#154d7a">
+<title>Settings</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-row">
+    <a class="icon-btn" id="back" href="index.html" aria-label="Back to the list">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><defs><mask id="pcw"><g transform="rotate(-42 50 50)"><rect x="41" y="24" width="18" height="56" rx="9" fill="#fff"/><circle cx="50" cy="28" r="19.5" fill="#fff"/><circle cx="50" cy="77" r="18.5" fill="#fff"/><circle cx="50" cy="28" r="9" fill="#000"/><circle cx="50" cy="77" r="8" fill="#000"/><rect x="41.5" y="-12" width="17" height="40" fill="#000"/></g></mask></defs><rect width="100" height="100" fill="currentColor" mask="url(#pcw)"/></svg>
+    <h1 class="brand">Settings</h1>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="card">
+    <h3>Storage areas</h3>
+    <p>The code becomes the first block of every label. Two or three letters works best.</p>
+    <div id="areaList"></div>
+    <button class="btn ghost" id="btnAddArea" style="height:40px;font-size:14px">Add an area</button>
+  </div>
+
+  <div class="card">
+    <h3>People</h3>
+    <p>Techs can look parts up and check them out or in. Administrators can do
+       everything, including changing what is on the shelves.</p>
+    <div id="userList"><span class="loading-text">Reading…</span></div>
+    <button class="btn ghost" id="btnAddUser" style="height:40px;font-size:14px;margin-top:8px">
+      Add a person</button>
+  </div>
+
+  <div class="card" id="userForm" style="display:none">
+    <h3 id="userFormTitle">Add a person</h3>
+    <p id="userFormNote">They sign in with this user name.</p>
+    <div class="field"><label for="u_user">User name</label>
+      <input id="u_user" type="text" autocapitalize="none" spellcheck="false"></div>
+    <div class="field"><label for="u_name">Their name</label>
+      <input id="u_name" type="text" placeholder="Dale Webb"></div>
+    <div class="field"><label for="u_role">What they can do</label>
+      <select id="u_role">
+        <option value="tech">Tech — look up, check out and in</option>
+        <option value="admin">Administrator — everything</option>
+      </select></div>
+    <div class="field"><label for="u_pass">Password</label>
+      <input id="u_pass" type="text" autocomplete="off">
+      <div class="hint" id="passHint">At least 8 characters. Avoid common passwords — they must replace it on first sign-in.</div></div>
+    <div class="actions" style="margin-top:0">
+      <button class="btn ghost" id="btnCancelUser">Cancel</button>
+      <button class="btn primary" id="btnSaveUser">Save person</button>
+    </div>
+  </div>
+
+  
+
+  <div class="card">
+    <h3>Records</h3>
+    <a class="linkbtn" href="/api/export.csv">Download the parts list as CSV</a>
+    <a class="linkbtn" href="/api/log.csv">Download the movement log</a>
+    <a class="linkbtn" href="#" id="signOut">Sign out</a>
+  </div>
+
+  <div class="card">
+    <h3>Board</h3>
+    <div class="stats" id="cfgStats"><span class="loading-text">Reading…</span></div>
+    <button class="btn ghost" id="btnReboot" style="height:40px;font-size:14px;margin-top:10px">
+      Save now and restart</button>
+  </div>
+
+  <div class="actions">
+    <a class="btn ghost" id="cancel" href="index.html">Cancel</a>
+    <button class="btn primary" id="btnSaveCfg">Save settings</button>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+"use strict";
+let cfg = { areas: [] };
+$("back").href = $("cancel").href = backTo();
+
+function renderAreas(){
+  $("areaList").innerHTML = cfg.areas.map((a, i) =>
+    `<div class="arearow">
+       <input value="${esc(a.code)}" maxlength="4" data-ac="${i}" aria-label="Area code">
+       <input value="${esc(a.name)}" data-an="${i}" aria-label="Area name">
+       <button data-adel="${i}" aria-label="Remove ${esc(a.name)}">&times;</button></div>`).join("");
+}
+$("btnAddArea").addEventListener("click", () => {
+  // Keep whatever is typed before adding a blank row, or it gets wiped.
+  syncAreasFromInputs();
+  cfg.areas.push({ code:"", name:"" });
+  renderAreas();
+});
+$("areaList").addEventListener("click", e => {
+  const b = e.target.closest("[data-adel]"); if(!b) return;
+  syncAreasFromInputs();
+  cfg.areas.splice(+b.dataset.adel, 1);
+  renderAreas();
+});
+function syncAreasFromInputs(){
+  const out = [];
+  document.querySelectorAll("[data-ac]").forEach(el => {
+    const i = el.dataset.ac;
+    const nameEl = document.querySelector(`[data-an="${i}"]`);
+    out.push({ code: el.value.trim().toUpperCase(), name: (nameEl ? nameEl.value : "").trim() });
+  });
+  cfg.areas = out;
+}
+
+$("btnSaveCfg").addEventListener("click", async () => {
+  syncAreasFromInputs();
+  const areas = cfg.areas.filter(a => a.code).map(a => ({ code:a.code, name:a.name || a.code }));
+  if(!areas.length){ toast("Keep at least one area", true); return; }
+  const codes = areas.map(a => a.code);
+  const dup = codes.find((c, i) => codes.indexOf(c) !== i);
+  if(dup){ toast(`Two areas are both called ${dup}`, true); return; }
+  const pass = $("c_pass").value;
+  if(pass.length && pass.length < 8){ toast("Password needs eight characters or more", true); return; }
+  try{
+    const r = await api("/api/config", { ssid: $("c_ssid").value.trim(), pass, areas });
+    if(r.reboot){
+      toast("Restarting — rejoin the new network");
+      setTimeout(() => api("/api/reboot", {}).catch(() => {}), 900);
+    } else {
+      location.href = backTo();
+    }
+  }catch(e){ toast(e.message, true); }
+});
+
+$("signOut").addEventListener("click", e => { e.preventDefault(); signOut(); });
+$("btnReboot").addEventListener("click", () => {
+  if(!confirm("Save and restart the board?")) return;
+  api("/api/reboot", {}).catch(() => {});
+  toast("Restarting — rejoin in a moment");
+});
+
+/* ------------------------------------------------------------ people */
+let editingUser = null;
+
+function renderUsers(list){
+  $("userList").innerHTML = list.map(u => `
+    <div class="userrow">
+      <div><b>${esc(u.name || u.user)}</b><small>${esc(u.user)}</small></div>
+      <span class="pill ${u.role === "admin" ? "admin" : ""}">${u.role === "admin" ? "Admin" : "Tech"}</span>
+      <button data-uedit="${esc(u.user)}" aria-label="Edit ${esc(u.user)}">&#9998;</button>
+      <button data-udel="${esc(u.user)}" aria-label="Remove ${esc(u.user)}"
+              style="color:var(--over)">&times;</button>
+    </div>`).join("") || `<p class="hint">No accounts yet.</p>`;
+}
+async function loadUsers(){
+  try{ renderUsers((await api("/api/users")).users || []); }
+  catch(e){ $("userList").innerHTML = `<p class="hint">${esc(e.message)}</p>`; }
+}
+function openUserForm(u){
+  editingUser = u ? u.user : null;
+  $("userFormTitle").textContent = u ? `Edit ${u.name || u.user}` : "Add a person";
+  $("userFormNote").textContent = u
+    ? "Leave the password blank to keep the current one."
+    : "They sign in with this user name.";
+  $("passHint").textContent = u
+    ? "Setting a new one signs them out everywhere. At least 8 characters, and not a common password."
+    : "At least 8 characters. Avoid common passwords — they must replace it on first sign-in.";
+  $("u_user").value = u ? u.user : "";
+  $("u_user").disabled = !!u;
+  $("u_name").value = u ? (u.name || "") : "";
+  $("u_role").value = u ? u.role : "tech";
+  $("u_pass").value = "";
+  $("userForm").style.display = "";
+  $("userForm").scrollIntoView({ block: "center", behavior: "smooth" });
+}
+$("btnAddUser").addEventListener("click", ()=> openUserForm(null));
+$("btnCancelUser").addEventListener("click", ()=>{ $("userForm").style.display = "none"; });
+$("userList").addEventListener("click", async e => {
+  const ed = e.target.closest("[data-uedit]");
+  if(ed){
+    const list = (await api("/api/users")).users || [];
+    const u = list.find(x => x.user === ed.dataset.uedit);
+    if(u) openUserForm(u);
+    return;
+  }
+  const del = e.target.closest("[data-udel]");
+  if(!del) return;
+  const who = del.dataset.udel;
+  if(!confirm(`Remove ${who}? They will be signed out and cannot sign back in.`)) return;
+  try{ await api("/api/users/delete", { user: who }); toast("Removed"); loadUsers(); }
+  catch(err){ toast(err.message, true); }
+});
+$("btnSaveUser").addEventListener("click", async ()=>{
+  const payload = { user: editingUser || $("u_user").value.trim(),
+                    name: $("u_name").value.trim(),
+                    role: $("u_role").value, pass: $("u_pass").value };
+  if(!editingUser && !payload.pass){ toast("Set a temporary password", true); return; }
+  if(payload.pass){
+    const problem = passwordProblem(payload.pass, { minLen: 8, username: payload.user });
+    if(problem){ toast(problem, true); return; }
+  }
+  try{
+    await api("/api/users/save", payload);
+    $("userForm").style.display = "none";
+    toast(editingUser ? "Saved" : "Account created");
+    loadUsers();
+  }catch(e){ toast(e.message, true); }
+});
+
+/* ------------------------------------------------------------- start */
+(async function(){
+  await requireSession();
+  if(!isAdmin()){ location.replace(backTo()); return; }
+  loadUsers();
+  try{
+    cfg = await api("/api/config");
+    if(!cfg.areas) cfg.areas = [];
+    $("c_ssid").value = cfg.ssid || "";
+    $("c_pass").value = cfg.pass || "";
+    renderAreas();
+    const s = await api("/api/stats");
+    const desktop = s.host === "desktop";
+    const common =
+      `parts ${s.parts} · units ${s.units}<br>` +
+      `untracked ${s.untracked} · low ${s.low} · over ${s.over}<br>` +
+      `writes ${s.saves} · ui build 9`;
+    $("cfgStats").innerHTML = desktop
+      ? `running on this computer<br>` +
+        `folder ${esc(s.path || "?")}<br>` +
+        (s.readOnly ? `<b style="color:var(--over)">card is write protected</b><br>` : "") +
+        common
+      : `card ${s.sd ? "mounted" : "MISSING"}<br>` +
+        `psram free ${(s.freePsram / 1048576).toFixed(2)} MB<br>` +
+        `heap free ${(s.freeHeap / 1024).toFixed(0)} KB · up ${Math.floor(s.uptime / 60)} min<br>` +
+        common;
+    if(desktop){
+      $("btnReboot").style.display = "none";
+      document.querySelector("#c_pass").closest(".card").querySelector("p").textContent =
+        "Saved to the card. The board picks these up the next time it boots.";
+      document.querySelector(".card h3").closest(".card").scrollIntoView({block:"start"});
+      window.scrollTo(0,0);
+    }
+  }catch(e){ toast(e.message, true); }
+})();
+</script>
+</body>
+</html>

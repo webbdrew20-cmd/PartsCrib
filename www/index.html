@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#154d7a">
+<title>Parts Crib</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="top stick">
+  <div class="top-row">
+    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><defs><mask id="pcw"><g transform="rotate(-42 50 50)"><rect x="41" y="24" width="18" height="56" rx="9" fill="#fff"/><circle cx="50" cy="28" r="19.5" fill="#fff"/><circle cx="50" cy="77" r="18.5" fill="#fff"/><circle cx="50" cy="28" r="9" fill="#000"/><circle cx="50" cy="77" r="8" fill="#000"/><rect x="41.5" y="-12" width="17" height="40" fill="#000"/></g></mask></defs><rect width="100" height="100" fill="currentColor" mask="url(#pcw)"/></svg>
+    <h1 class="brand"><span class="wm"><b>Parts</b><i>Crib</i></span><small id="sub">Loading…</small></h1>
+    <button class="icon-btn" id="outBtn" title="Sign out" aria-label="Sign out">
+      <svg viewBox="0 0 24 24"><path d="M15 17l5-5-5-5M20 12H9M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6"/></svg></button>
+    <a class="icon-btn" id="guideLink" href="guide.html" title="How to set this up and use it"
+       aria-label="How to set this up and use it">
+      <svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M8 7.5h7M8 11h5"/></svg></a>
+    <a class="icon-btn" id="cfgLink" href="settings.html" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><path d="M4 7h7M15 7h5M4 12h11M19 12h1M4 17h3M11 17h9"/><circle cx="13" cy="7" r="2.1"/><circle cx="17" cy="12" r="2.1"/><circle cx="9" cy="17" r="2.1"/></svg></a>
+  </div>
+  <div class="search" id="searchWrap">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+    <input id="q" type="search" enterkeyhint="search" autocomplete="off"
+           placeholder="Search Part">
+    <button class="clear" id="clearQ" aria-label="Clear search">&times;</button>
+  </div>
+</header>
+
+<nav class="filters" id="filters"></nav>
+<button class="banner" id="banner"></button>
+<main class="list" id="list"></main>
+
+<a class="fab" id="addLink" href="add.html">
+  <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add part</a>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+"use strict";
+const url   = new URLSearchParams(location.search);
+const state = { q: url.get("q") || "", area: url.get("area") || "",
+                alerts: url.get("alerts") === "1", cfg: { areas: [] }, stats: {} };
+let items = [];
+
+// The list's filters live in the URL, so leaving for a form and coming back
+// puts you exactly where you were.
+function listQuery(){
+  const p = new URLSearchParams();
+  if(state.q) p.set("q", state.q);
+  if(state.area) p.set("area", state.area);
+  if(state.alerts) p.set("alerts", "1");
+  const s = p.toString();
+  return s ? "?" + s : "";
+}
+function hereUrl(){ return "index.html" + listQuery(); }
+function syncUrl(){
+  const s = listQuery();
+  history.replaceState(null, "", s || location.pathname);
+  let add = "add.html";
+  if(state.area) add += "?area=" + encodeURIComponent(state.area);
+  $("addLink").href = withBack(add, hereUrl());
+  $("cfgLink").href = withBack("settings.html", hereUrl());
+}
+
+function renderFilters(){
+  const out = [`<button class="chip" data-area="" aria-pressed="${!state.area && !state.alerts}">All areas</button>`];
+  for(const a of state.cfg.areas){
+    const n = (state.stats.byArea && state.stats.byArea[a.code]) || 0;
+    out.push(`<button class="chip" data-area="${esc(a.code)}" aria-pressed="${state.area === a.code}">` +
+             `${esc(a.name)}<span class="n">${n}</span></button>`);
+  }
+  const low = (state.stats.low || 0) + (state.stats.out || 0);
+  out.push(`<button class="chip warn" data-alerts="1" aria-pressed="${state.alerts}">` +
+           `Needs attention<span class="n">${low}</span></button>`);
+  $("filters").innerHTML = out.join("");
+}
+function renderBanner(){
+  const b = $("banner"), low = state.stats.low || 0, gone = state.stats.out || 0;
+  if((low + gone) === 0 || state.alerts){ b.className = "banner"; return; }
+  const bits = [];
+  if(gone) bits.push(`<b>${gone}</b> out of stock`);
+  if(low)  bits.push(`<b>${low}</b> to reorder`);
+  b.innerHTML = `<span class="b-txt">${bits.join(", ")}</span><span class="b-go">Show</span>`;
+  b.className = "banner on";
+}
+function skeletonRows(n){
+  return Array.from({length:n}, () => `<article class="row skel">
+    <div class="row-main"><div class="sk sk-name"></div><div class="sk sk-meta"></div></div>
+    <div class="qty"><div class="sk sk-count"></div></div></article>`).join("");
+}
+const EMPTY_ICON = `<svg viewBox="0 0 24 24"><path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>`;
+function rowHTML(p){
+  const tag = p.label
+    ? `<span class="tag${p.nospot ? " floor" : ""}">${esc(p.label)}</span>`
+    : `<span class="tag none">no location</span>`;
+  const st  = p.state === "out" ? `<span class="state out">Out of stock</span>`
+            : p.state === "low" ? `<span class="state">Reorder</span>` : "";
+  const right = p.tracked
+    ? `<div class="qty">
+         <div class="count" data-count="${p.id}">${p.qty}<small>${esc(p.unit || "ea")}</small></div>
+         <button class="co" data-co="${p.id}"${p.qty < 1 ? " disabled" : ""}
+                 aria-label="Check out one ${esc(p.name)}">Check out</button>
+       </div>`
+    : `<div class="untracked"><b>&ndash;</b>not counted</div>`;
+  return `<article class="row ${p.state}">
+    <button class="row-main" data-open="${p.id}">
+      <div class="name">${esc(p.name)}</div>
+      <div class="meta">${tag}${st}${p.pn ? `<span class="pn">${esc(p.pn)}</span>` : ""}</div>
+    </button>${right}</article>`;
+}
+
+async function refresh(keepScroll){
+  const y = window.scrollY;
+  const p = new URLSearchParams();
+  if(state.q) p.set("q", state.q);
+  if(state.area) p.set("area", state.area);
+  if(state.alerts) p.set("alerts", "1");
+  p.set("limit", "200");
+  try{
+    const [d, s] = await Promise.all([api("/api/parts?" + p), api("/api/stats")]);
+    state.stats = s; items = d.items;
+    const flag = (s.low||0)+(s.out||0);
+    $("sub").innerHTML = `${s.parts} parts` + (flag ? ` · ${flag} to order` : "") +
+      (ME ? ` <span class="whoami">· ${esc(ME.name || ME.user)}</span>` : "");
+    renderFilters(); renderBanner(); syncUrl();
+    const list = $("list");
+    if(d.items.length) list.innerHTML = d.items.map(rowHTML).join("");
+    else if(state.q) list.innerHTML =
+      `<div class="empty">${EMPTY_ICON}<p><b>Nothing matches &ldquo;${esc(state.q)}&rdquo;</b></p>
+       <p>Try a shorter word, or add it as a new part.</p></div>`;
+    else if(state.alerts) list.innerHTML =
+      `<div class="empty">${EMPTY_ICON}<p><b>Everything is above its minimum</b></p>
+       <p>Nothing needs ordering right now.</p></div>`;
+    else if(state.area) list.innerHTML =
+      `<div class="empty">${EMPTY_ICON}<p><b>This area is empty</b></p>
+       <p>Add the first part and give it a bin.</p></div>`;
+    else list.innerHTML =
+      `<div class="empty">${EMPTY_ICON}<p><b>The crib is empty</b></p>
+       <p>Add your first part to start tracking.</p></div>`;
+    if(keepScroll) window.scrollTo(0, y);
+  }catch(e){ toast(e.message, true); }
+}
+
+let qT;
+$("q").addEventListener("input", e => {
+  state.q = e.target.value;
+  $("searchWrap").classList.toggle("has-text", !!state.q);
+  clearTimeout(qT); qT = setTimeout(() => refresh(), 180);
+});
+$("clearQ").addEventListener("click", () => {
+  $("q").value = ""; state.q = "";
+  $("searchWrap").classList.remove("has-text"); refresh();
+});
+$("filters").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if(!c) return;
+  if(c.dataset.alerts){ state.alerts = !state.alerts; state.area = ""; }
+  else { state.area = c.dataset.area; state.alerts = false; }
+  refresh();
+});
+$("banner").addEventListener("click", () => { state.alerts = true; state.area = ""; refresh(); });
+
+$("list").addEventListener("click", async e => {
+  const open = e.target.closest("[data-open]");
+  if(open){
+    location.href = withBack("part.html?id=" + encodeURIComponent(open.dataset.open), hereUrl());
+    return;
+  }
+  // One tap takes one off the shelf. Anything more than that, or putting
+  // something back, happens on the part's own page.
+  const co = e.target.closest("[data-co]");
+  if(!co) return;
+  const id = co.dataset.co;
+  const cell = document.querySelector(`[data-count="${id}"]`);
+  co.disabled = true;
+  try{
+    const p = await api("/api/part/adjust", { id, delta: -1, action: "checkout" });
+    const i = items.findIndex(x => x.id === id);
+    if(i >= 0) items[i] = p;
+    if(cell){
+      cell.firstChild.nodeValue = p.qty;
+      cell.classList.remove("flash"); void cell.offsetWidth; cell.classList.add("flash");
+      cell.closest(".row").className = "row " + p.state;
+    }
+    co.disabled = p.qty < 1;
+    toast(`Checked out 1 · ${p.qty} left`);
+    const s = await api("/api/stats"); state.stats = s;
+    const f2 = (s.low||0)+(s.out||0);
+    $("sub").innerHTML = `${s.parts} parts` + (f2 ? ` · ${f2} to order` : "") +
+      (ME ? ` <span class="whoami">· ${esc(ME.name || ME.user)}</span>` : "");
+    renderFilters(); renderBanner();
+  }catch(err){ co.disabled = false; toast(err.message, true); refresh(true); }
+});
+
+// Only redraw when something actually moved, so a background poll never yanks
+// the list out from under someone mid-scroll.
+let lastSig = "";
+async function poll(){
+  try{
+    const s = await api("/api/stats");
+    const sig = [s.parts, s.units, s.low, s.over].join(":");
+    if(lastSig && sig !== lastSig) await refresh(true);
+    lastSig = sig;
+  }catch(e){}
+}
+
+$("outBtn").addEventListener("click", signOut);
+
+$("list").innerHTML = skeletonRows(6);
+
+(async function(){
+  await requireSession();
+  if(!isAdmin()){
+    $("addLink").style.display = "none";     // the server refuses these anyway
+    $("cfgLink").style.display = "none";
+    $("guideLink").style.display = "none";
+  }
+  $("q").value = state.q;
+  $("searchWrap").classList.toggle("has-text", !!state.q);
+  try{ state.cfg = await api("/api/config"); }catch(e){ state.cfg = { areas: [] }; }
+  await refresh();
+  lastSig = [state.stats.parts, state.stats.units, state.stats.low, state.stats.over].join(":");
+  keepFresh(poll, 15);
+})();
+</script>
+</body>
+</html>

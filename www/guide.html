@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#154d7a">
+<title>Guide — Parts Crib</title>
+<link rel="stylesheet" href="app.css">
+<style>
+/* This page deliberately loads no JavaScript and calls no API, so it reads the
+   same double-clicked from the folder as it does inside the running app. That
+   matters: "how do I put this on the server" cannot require a running server. */
+.guide{max-width:760px;margin:0 auto;padding:18px 16px 64px}
+.guide h2{font-size:20px;font-weight:700;margin:36px 0 11px;padding-top:16px;
+  border-top:2px solid var(--rule);letter-spacing:-.012em}
+.guide h2:first-of-type{border-top:none;padding-top:0;margin-top:8px}
+.guide h3{font-size:15.5px;font-weight:700;margin:20px 0 6px}
+.guide p{margin:0 0 11px;font-size:15px;line-height:1.6;color:var(--ink)}
+.guide ul{margin:0 0 12px;padding-left:20px;font-size:15px;line-height:1.6}
+.guide li{margin-bottom:5px}
+.lede{font-size:16.5px;line-height:1.55;color:var(--ink)}
+
+.toc{background:#fff;border:1px solid var(--rule);border-radius:var(--r-md);padding:15px 17px;
+  margin-bottom:10px;box-shadow:var(--shadow-1)}
+.toc h3{margin:0 0 8px;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink2);font-weight:700}
+.toc ol{margin:0;padding-left:20px;font-size:15px;line-height:1.95}
+.toc a{text-decoration:none;font-weight:550;transition:color .12s var(--ease)}
+.toc a:hover{color:var(--steel-l)}
+
+ol.steps{list-style:none;counter-reset:s;margin:0 0 14px;padding:0}
+ol.steps > li{counter-increment:s;position:relative;padding:0 0 18px 46px;font-size:15px;line-height:1.6}
+ol.steps > li::before{content:counter(s);position:absolute;left:0;top:-1px;
+  width:30px;height:30px;background:linear-gradient(165deg,var(--steel-l),var(--steel-d));color:#fff;
+  border-radius:var(--r-sm);box-shadow:var(--shadow-1);
+  display:grid;place-items:center;font-weight:700;font-size:15px}
+ol.steps > li b{display:block;font-weight:700;margin-bottom:3px}
+
+.guide code{font:600 13.5px/1.5 var(--mono);background:#eef1ee;border:1px solid var(--rule);
+  border-radius:4px;padding:1px 6px;white-space:nowrap}
+pre{font:500 13px/1.6 var(--mono);background:#14181b;color:#e8ecea;padding:13px 15px;
+  overflow-x:auto;margin:0 0 12px;border-radius:var(--r-sm);box-shadow:var(--shadow-1)}
+pre b{color:#ffd479;font-weight:700}
+
+.note,.warn{border:1px solid var(--rule);border-left:4px solid var(--steel);border-radius:var(--r-sm);
+  background:#fff;padding:13px 15px;margin:0 0 14px;font-size:14.5px;line-height:1.55;box-shadow:var(--shadow-1)}
+.warn{border-left-color:var(--over);background:var(--over-bg)}
+.note strong,.warn strong{display:block;margin-bottom:3px;font-weight:700}
+
+table.key{width:100%;border-collapse:collapse;margin:0 0 14px;font-size:14.5px}
+table.key td{border-bottom:1px solid var(--rule);padding:10px 6px;vertical-align:top}
+table.key tr:last-child td{border-bottom:none}
+table.key td:first-child{width:104px;font-weight:700;white-space:nowrap}
+.dot{display:inline-block;width:11px;height:11px;margin-right:7px;vertical-align:-1px;border-radius:3px}
+.d-out{background:var(--over)}.d-low{background:var(--low)}.d-ok{background:var(--ok)}.d-off{background:var(--off)}
+
+.printhint{font-size:13px;color:var(--ink2);margin:26px 0 0;padding-top:14px;
+  border-top:1px solid var(--rule)}
+@media print{
+  .top,.printhint{display:none}
+  body{background:#fff}
+  .guide{max-width:none;padding:0}
+  pre{background:#f2f2f0;color:#14181b;border:1px solid #ccc}
+  .guide h2{page-break-after:avoid}
+  ol.steps > li{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-row">
+    <a class="icon-btn" href="index.html" aria-label="Back to the crib">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><defs><mask id="pcw"><g transform="rotate(-42 50 50)"><rect x="41" y="24" width="18" height="56" rx="9" fill="#fff"/><circle cx="50" cy="28" r="19.5" fill="#fff"/><circle cx="50" cy="77" r="18.5" fill="#fff"/><circle cx="50" cy="28" r="9" fill="#000"/><circle cx="50" cy="77" r="8" fill="#000"/><rect x="41.5" y="-12" width="17" height="40" fill="#000"/></g></mask></defs><rect width="100" height="100" fill="currentColor" mask="url(#pcw)"/></svg>
+    <h1 class="brand"><span class="wm"><b>Parts</b><i>Crib</i></span><small>Setup and usage guide</small></h1>
+  </div>
+</header>
+
+<main class="guide">
+
+<p class="lede">Parts Crib keeps track of what is on the shelves in the tool room,
+the maintenance cage, the pump room and the compressor room — what it is, which
+bin it lives in, how many are left, and who took the last one.</p>
+
+<p>It runs on one ordinary Windows PC. Everyone else opens it in a web browser,
+including phones on the shop wifi. There is nothing to install on anybody's
+machine, no database to set up and no monthly fee.</p>
+
+<div class="toc">
+  <h3>On this page</h3>
+  <ol>
+    <li><a href="#what">What is actually in the folder</a></li>
+    <li><a href="#try">Trying it on one computer first</a></li>
+    <li><a href="#server">Putting it on the server for everybody</a></li>
+    <li><a href="#accounts">Setting up who can use it</a></li>
+    <li><a href="#daily">Using it day to day</a></li>
+    <li><a href="#colours">What the colours mean</a></li>
+    <li><a href="#backups">Backups and records</a></li>
+    <li><a href="#limits">Where the line is</a></li>
+
+  </ol>
+</div>
+
+<h2 id="what">1. What is actually in the folder</h2>
+
+<pre>PartsCrib.exe     <b>the program — this is the whole thing</b>
+www\              the screens people see
+inventory\        the data: parts, accounts, the movement log</pre>
+
+<p><code>PartsCrib.exe</code> is a small web server, about 5 MB. It does not
+install anything, does not touch the registry, and needs no administrator rights
+to run. Deleting the folder removes it completely.</p>
+
+<div class="note"><strong>Everything lives in that folder</strong>
+Back up <code>inventory\</code> and you have backed up the crib. Copy the folder
+to another machine and it works there, exactly as it was.</div>
+
+<h2 id="try">2. Trying it on one computer first</h2>
+
+<p>Before committing to a server, run it on any PC to see what it does. Nothing
+is permanent and nothing is shared yet.</p>
+
+<ol class="steps">
+  <li><b>Copy the folder to the computer</b>
+    Somewhere simple like <code>C:\PartsCrib\</code>. Use the local disk, not a
+    network drive.</li>
+  <li><b>Double-click PartsCrib.exe</b>
+    A black window appears for a second and hides itself, then the crib opens
+    full screen with no address bar.</li>
+  <li><b>Sign in</b>
+    User name <code>MaintAdmin</code>, with the temporary password that came with
+    this installation. It isn't printed here on purpose — the app won't let you
+    do anything else until you replace it.</li>
+  <li><b>Have a look round</b>
+    Add a part, check it out, check it back in.</li>
+  <li><b>Close it</b>
+    Press <b>Alt</b>+<b>F4</b>. The program shuts itself down about half a
+    minute later. Your changes are already saved.</li>
+</ol>
+
+<div class="note"><strong>Windows may warn you the first time</strong>
+"Windows protected your PC" appears for any program that has not been through
+commercial code signing. Click <b>More info</b>, then <b>Run anyway</b>.</div>
+
+<h2 id="server">3. Putting it on the server for everybody</h2>
+
+<div class="warn"><strong>Do not put it on a shared drive and let everyone run it</strong>
+That is the obvious approach and it quietly destroys data. Each person would
+launch their own copy, and all of them would write the same file. Two people
+check parts out at the same moment and the second save wipes the first — no
+error, no warning, just a wrong number.
+<br><br>
+One computer runs the program. Everybody else gets a shortcut to a web address.</div>
+
+<p>The machine does not need to be a real server. Any PC that stays switched on
+will do, as long as people can reach it by name on the network.</p>
+
+<ol class="steps">
+  <li><b>Copy the folder to the server's local disk</b>
+    <code>C:\PartsCrib\</code>. Not a mapped drive, not a <code>\\server\share</code>
+    path — a local disk avoids a whole category of file-locking problems.</li>
+  <li><b>Start it in shared mode</b>
+    Open a command prompt in that folder and run:
+    <pre>C:\PartsCrib\PartsCrib.exe <b>-shared</b></pre>
+    It prints the addresses to hand out and stays running. This mode does not
+    open a browser and the window stays visible on purpose.</li>
+  <li><b>Let it through the firewall</b>
+    Once, in an <b>administrator</b> command prompt:
+    <pre>netsh advfirewall firewall add rule name="Parts Crib" ^
+  dir=in action=allow protocol=TCP localport=8787</pre>
+    This is the only step that needs administrator rights.</li>
+  <li><b>Make it start by itself after a reboot</b>
+    In Task Scheduler, create one task:
+    <ul>
+      <li>Trigger: <b>At startup</b></li>
+      <li>Action: start <code>C:\PartsCrib\PartsCrib.exe</code>, arguments
+        <code>-shared</code>, starting in <code>C:\PartsCrib</code></li>
+      <li>Tick <b>Run whether user is logged on or not</b></li>
+      <li>Untick <b>Stop the task if it runs longer than…</b> — it is meant to
+        run forever</li>
+    </ul></li>
+  <li><b>Give everyone the shortcut</b>
+    <code>Parts Crib.url</code> is in the folder. Open it in Notepad, change
+    <code>SERVERNAME</code> to the server's real name, and put it in
+    <code>C:\Users\Public\Desktop</code> on each machine, or push it out with
+    Group Policy.
+    <pre>[InternetShortcut]
+URL=http://<b>SERVERNAME</b>:8787/</pre>
+    Use the computer's name rather than its IP address, so a network change does
+    not break every shortcut at once.</li>
+</ol>
+
+<p>Phones and tablets on the shop wifi work too — same address, typed into any
+browser. No app to install.</p>
+
+<h2 id="accounts">4. Setting up who can use it</h2>
+
+<p>Nobody can see anything without signing in. There are two kinds of account.</p>
+
+<table class="key">
+  <tr><td>Tech</td><td>Look parts up, see where they live, check them out, check
+    them back in, and flag uncounted things for ordering.</td></tr>
+  <tr><td>Administrator</td><td>All of that, plus adding and editing parts,
+    changing settings, reading the movement log, and managing accounts.</td></tr>
+</table>
+
+<ol class="steps">
+  <li><b>Sign in as MaintAdmin and replace the password</b>
+    It will not let you do anything else until you do.</li>
+  <li><b>Add a person for each tech</b>
+    Settings → People → Add a person. Give each one a temporary password and
+    tell them what it is.</li>
+  <li><b>They replace it themselves</b>
+    The first time they sign in they are made to choose their own. Nobody but
+    them ever knows their real password — not even you. Anyone still holding a
+    temporary one is marked <b>Temporary</b> in the list.</li>
+</ol>
+
+<p>If somebody forgets theirs, open their entry in Settings and type a new
+temporary password. That signs them out everywhere and puts them back through
+the same prompt. You never need to know what they pick.</p>
+
+<h2 id="daily">5. Using it day to day</h2>
+
+<h3>Finding something</h3>
+<p>Type into the search box at the top. It matches the name, the part number,
+the bin label, the notes and any keywords — so <code>6205 bearing</code> and
+<code>pump seal</code> both work, in either word order. The area buttons
+underneath narrow it to one room.</p>
+
+<h3>Taking a part</h3>
+<p>Tap <b>Check out</b> on the row for one. For more than one, tap the part
+itself, set the number, then <b>Check out</b>. Every movement is recorded
+against the account that made it.</p>
+
+<h3>Putting one back</h3>
+<p>Open the part and tap <b>Check in</b>. It will not let the count go above the
+level an administrator stocked — if the shelf holds twelve, twelve is the most
+that can ever be on it. The button says <b>Room for 2</b> or <b>All 12 are in</b>
+rather than letting somebody tap and get an error.</p>
+
+<h3>When a shipment arrives</h3>
+<p>That is not a check-in, it is a new stock level. Open the part, tap the pencil
+to edit it, and type the new number into <b>On hand</b>. Administrators only.
+This keeps the movement log honest: a check-in of fourteen should mean fourteen
+parts came back from the floor.</p>
+
+<h3>Things nobody counts</h3>
+<p>Bolts, batteries, zip ties. Turn off <b>Watch the count on this part</b> when
+adding them and they show a location but no number. Since nothing can notice
+they are running out, they get an <b>Order more</b> button instead — anyone can
+tap it, the part turns amber and joins the reorder list, and whoever puts the new
+box away clears it.</p>
+
+<h3>Where things live</h3>
+<p>A label reads <code>MC-1-2-7</code> — maintenance cage, bin 1, row 2, column
+7. For a pallet or a drum sitting on the floor of a room, tick <b>No designated
+placement</b> and it reads <code>PR - no designated section</code> instead, which
+tells a tech the room without sending them hunting for a shelf that does not
+exist.</p>
+
+<h2 id="colours">6. What the colours mean</h2>
+
+<table class="key">
+  <tr><td><span class="dot d-out"></span>Red</td>
+      <td><b>Out of stock.</b> None left. Sorted to the top of every list.</td></tr>
+  <tr><td><span class="dot d-low"></span>Amber</td>
+      <td><b>Reorder.</b> At or below the level set for that part, or flagged by
+        hand for something uncounted.</td></tr>
+  <tr><td><span class="dot d-ok"></span>Green</td>
+      <td>Fine. Nothing to do.</td></tr>
+  <tr><td><span class="dot d-off"></span>Grey</td>
+      <td>Not counted, and nobody has asked for more.</td></tr>
+</table>
+
+<p>The word next to the label says the same thing, so nothing depends on being
+able to tell the colours apart. The <b>Needs attention</b> button at the top
+shows everything red or amber in one list — that is your ordering list.</p>
+
+<h2 id="backups">7. Backups and records</h2>
+
+<ul>
+  <li><b>Every change is written immediately</b> to <code>inventory\parts.json</code>,
+    and the previous version is kept as <code>parts.bak</code>.</li>
+  <li><b>The first change each day</b> snapshots the whole file into
+    <code>inventory\backups\</code>. The last thirty days are kept.</li>
+  <li><b>The movement log</b> is <code>inventory\log.csv</code> — every checkout,
+    check-in, edit and deletion, with the date and the account that did it.
+    Download it from Settings and open it in Excel.</li>
+  <li><b>The parts list</b> exports to CSV from Settings as well, for counting
+    sheets or purchase orders.</li>
+</ul>
+
+<p>Point the normal server backup at <code>C:\PartsCrib\</code> and everything
+above is covered.</p>
+
+<h2 id="limits">8. Where the line is</h2>
+
+<p>Signing in stops a coworker deleting parts, fudging a count, or checking in
+stock that never existed, and it puts a name against every movement. That is
+what it is for.</p>
+
+</main>
+</body>
+</html>

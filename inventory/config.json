@@ -1,0 +1,24 @@
+{
+  "ssid": "PARTS-CRIB",
+  "pass": "",
+  "channel": 6,
+  "nextId": 17,
+  "areas": [
+    {
+      "code": "TR",
+      "name": "Tool Room"
+    },
+    {
+      "code": "MC",
+      "name": "Maintenance Cage"
+    },
+    {
+      "code": "PR",
+      "name": "Pump Room"
+    },
+    {
+      "code": "CR",
+      "name": "Compressor Room"
+    }
+  ]
+}

@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#154d7a">
+<title>Add part</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-row">
+    <a class="icon-btn" id="back" href="index.html" aria-label="Back to the list">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><defs><mask id="pcw"><g transform="rotate(-42 50 50)"><rect x="41" y="24" width="18" height="56" rx="9" fill="#fff"/><circle cx="50" cy="28" r="19.5" fill="#fff"/><circle cx="50" cy="77" r="18.5" fill="#fff"/><circle cx="50" cy="28" r="9" fill="#000"/><circle cx="50" cy="77" r="8" fill="#000"/><rect x="41.5" y="-12" width="17" height="40" fill="#000"/></g></mask></defs><rect width="100" height="100" fill="currentColor" mask="url(#pcw)"/></svg>
+    <h1 class="brand" id="title">Add part</h1>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="field"><label for="f_name">What is it</label>
+    <input id="f_name" type="text" placeholder="Bearing, 6205 sealed"></div>
+  <div class="field"><label for="f_pn">Part number</label>
+    <input id="f_pn" type="text" placeholder="SKF-6205-2RS"></div>
+
+  <div class="field">
+    <label>Where it lives</label>
+    <div class="grid4" id="spotGrid">
+      <div><label for="f_area">Area</label><select id="f_area"></select></div>
+      <div><label for="f_bin">Bin</label><input id="f_bin" type="text"></div>
+      <div><label for="f_row">Row</label><input id="f_row" type="text" inputmode="numeric"></div>
+      <div><label for="f_col">Column</label><input id="f_col" type="text" inputmode="numeric"></div>
+    </div>
+    <div class="field" id="areaOnly" style="display:none;margin:0">
+      <label for="f_area2">Area</label><select id="f_area2"></select>
+    </div>
+    <label class="toggle" style="margin:10px 0 0">
+      <input type="checkbox" id="f_nospot">
+      <div><strong>No designated placement</strong>
+        <span>For anything sitting on the floor of the room rather than in a
+          bin — a pallet, a drum, a crate.</span></div>
+    </label>
+    <div class="preview" id="labelPreview">—</div>
+    <div class="hint" id="labelHint">Prints as area-bin-row-column, the way the shelves are marked.</div>
+  </div>
+
+  <div class="grid2">
+    <div class="field"><label for="f_qty">On hand</label>
+      <input id="f_qty" type="number" inputmode="numeric" min="0" value="0">
+      <div class="hint">This is the full shelf. Techs can check parts back in up
+        to this number and no further, so raise it when a shipment lands.</div></div>
+    <div class="field"><label for="f_unit">Counted in</label>
+      <input id="f_unit" type="text" placeholder="ea, ft, box"></div>
+  </div>
+
+  <label class="toggle">
+    <input type="checkbox" id="f_tracked" checked>
+    <div><strong>Watch the count on this part</strong>
+      <span>Turn this off for bolts, batteries and anything else you never count.</span></div>
+  </label>
+
+  <div id="limits">
+    <div class="field"><label for="f_min">Turn amber at or below</label>
+      <input id="f_min" type="number" inputmode="numeric" min="0" value="0">
+      <div class="hint">Amber here, red when it reaches zero.</div></div>
+  </div>
+
+  <div class="field"><label for="f_kw">Search keywords</label>
+    <div class="chips" id="kwChips"></div>
+    <input id="f_kw" type="text" placeholder="Type a word, press enter">
+    <div class="hint">Whatever someone would actually type: conveyor, gearbox, line 3.</div></div>
+
+  <div class="field"><label for="f_comment">Notes</label>
+    <textarea id="f_comment" placeholder="Fits the line 3 gearbox. Two on the shelf are used."></textarea></div>
+
+  <div class="actions">
+    <button class="btn danger" id="btnDel" style="display:none" aria-label="Delete part">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6.5 7l1 13h9l1-13"/></svg></button>
+    <a class="btn ghost" id="cancel" href="index.html">Cancel</a>
+    <button class="btn primary" id="btnSave">Save part</button>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+"use strict";
+const qs      = new URLSearchParams(location.search);
+const partId  = qs.get("id") || "";
+let kw = [], cfg = { areas: [] }, loaded = null;
+
+$("back").href = $("cancel").href = backTo();
+
+function areaOptions(sel){
+  return `<option value=""${sel ? "" : " selected"}>—</option>` +
+    cfg.areas.map(a =>
+      `<option value="${esc(a.code)}"${a.code === sel ? " selected" : ""}>${esc(a.code)}</option>`).join("");
+}
+function syncSpot(){
+  const off = $("f_nospot").checked;
+  $("spotGrid").style.display = off ? "none" : "";
+  $("areaOnly").style.display = off ? "" : "none";
+  if(off) $("f_area2").value = $("f_area").value;
+  else    $("f_area").value  = $("f_area2").value;
+  $("labelHint").textContent = off
+    ? "It shows the room it is in, without pretending it has a shelf position."
+    : "Prints as area-bin-row-column, the way the shelves are marked.";
+  updatePreview();
+}
+function updatePreview(){
+  if($("f_nospot").checked){
+    const a = $("f_area2").value.trim();
+    $("labelPreview").textContent = a ? a + " - no designated section" : "no designated section";
+    return;
+  }
+  const bits = [$("f_area").value, $("f_bin").value, $("f_row").value, $("f_col").value]
+                 .map(s => s.trim()).filter(Boolean);
+  $("labelPreview").textContent = bits.length ? bits.join("-") : "—";
+}
+function renderKw(){
+  $("kwChips").innerHTML = kw.map((k, i) =>
+    `<span class="kwchip">${esc(k)}<button data-kwdel="${i}" aria-label="Remove ${esc(k)}">&times;</button></span>`).join("");
+}
+function syncLimits(){ $("limits").style.display = $("f_tracked").checked ? "" : "none"; }
+
+function fill(p){
+  loaded = p;
+  document.title = p ? "Edit part" : "Add part";
+  $("title").textContent = p ? "Edit part" : "Add part";
+  const startArea = p ? p.area : (qs.get("area") || "");
+  $("f_area").innerHTML  = areaOptions(startArea);
+  $("f_area2").innerHTML = areaOptions(startArea);
+  $("f_nospot").checked  = p ? !!p.nospot : false;
+  $("f_name").value    = p ? p.name || "" : "";
+  $("f_pn").value      = p ? p.pn   || "" : "";
+  $("f_bin").value     = p ? p.bin  || "" : "";
+  $("f_row").value     = p ? p.row  || "" : "";
+  $("f_col").value     = p ? p.col  || "" : "";
+  $("f_qty").value     = p ? p.qty  || 0  : 0;
+  $("f_unit").value    = p ? p.unit || "ea" : "ea";
+  $("f_tracked").checked = p ? !!p.tracked : true;
+  $("f_min").value     = p ? p.min || 0 : 0;
+  $("f_comment").value = p ? p.comment || "" : "";
+  kw = p ? (p.keywords || []).slice() : [];
+  $("btnDel").style.display = p ? "" : "none";
+  renderKw(); syncSpot(); syncLimits();
+  if(!p) $("f_name").focus();
+}
+
+for(const id of ["f_area","f_area2","f_bin","f_row","f_col"]){
+  $(id).addEventListener("input", updatePreview);
+  $(id).addEventListener("change", updatePreview);
+}
+$("f_nospot").addEventListener("change", syncSpot);
+$("f_tracked").addEventListener("change", syncLimits);
+
+$("f_kw").addEventListener("keydown", e => {
+  if(e.key === "Enter" || e.key === ","){
+    e.preventDefault();
+    const v = $("f_kw").value.trim().replace(/,$/, "");
+    if(v && !kw.includes(v)) kw.push(v);
+    $("f_kw").value = ""; renderKw();
+  } else if(e.key === "Backspace" && !$("f_kw").value && kw.length){
+    kw.pop(); renderKw();
+  }
+});
+$("kwChips").addEventListener("click", e => {
+  const b = e.target.closest("[data-kwdel]"); if(!b) return;
+  kw.splice(+b.dataset.kwdel, 1); renderKw();
+});
+
+$("btnSave").addEventListener("click", async () => {
+  // A stray keyword left in the box would otherwise be lost on save.
+  const pending = $("f_kw").value.trim().replace(/,$/, "");
+  if(pending && !kw.includes(pending)) kw.push(pending);
+
+  const body = {
+    id: partId,
+    name: $("f_name").value.trim(),
+    pn:   $("f_pn").value.trim(),
+    area: $("f_nospot").checked ? $("f_area2").value : $("f_area").value,
+    nospot: $("f_nospot").checked,
+    bin:  $("f_nospot").checked ? "" : $("f_bin").value.trim(),
+    row:  $("f_nospot").checked ? "" : $("f_row").value.trim(),
+    col:  $("f_nospot").checked ? "" : $("f_col").value.trim(),
+    qty:  parseInt($("f_qty").value || "0", 10) || 0,
+    unit: $("f_unit").value.trim() || "ea",
+    tracked: $("f_tracked").checked,
+    min:  parseInt($("f_min").value || "0", 10) || 0,
+    comment: $("f_comment").value.trim(),
+    keywords: kw
+  };
+  if(!body.name){ toast("Give the part a name first", true); $("f_name").focus(); return; }
+  $("btnSave").disabled = true;
+  try{
+    await api("/api/part/save", body);
+    location.href = backTo();
+  }catch(e){
+    $("btnSave").disabled = false;
+    toast(e.message, true);
+  }
+});
+
+$("btnDel").addEventListener("click", async () => {
+  if(!loaded) return;
+  if(!confirm(`Delete ${loaded.name}? This cannot be undone.`)) return;
+  try{ await api("/api/part/delete", { id: partId }); location.href = backTo(); }
+  catch(e){ toast(e.message, true); }
+});
+
+(async function(){
+  await requireSession();
+  if(!isAdmin()){ location.replace(backTo()); return; }
+  try{ cfg = await api("/api/config"); }catch(e){ cfg = { areas: [] }; }
+  if(partId){
+    try{ fill(await api("/api/part?id=" + encodeURIComponent(partId))); }
+    catch(e){ toast(e.message, true); fill(null); }
+  } else fill(null);
+})();
+</script>
+</body>
+</html>

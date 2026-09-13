@@ -1,0 +1,10 @@
+# User accounts (created automatically on first run — never commit)
+inventory/users.json
+
+# Runtime data
+inventory/log.csv
+inventory/*.bak
+inventory/backups/
+
+# Dev logs
+*.log
