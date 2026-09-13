@@ -62,7 +62,7 @@ www/                 Web UI — pages, styles, and client logic
   app.css / app.js   Shared styles and client logic
 inventory/
   config.json        Areas, Wi-Fi/AP settings, ID counter
-  parts.json         Parts database (ships with sample data)
+  parts.json         Parts database (starts empty — add your own)
   users.json         User accounts (created on first run — not in git)
 ```
 
