@@ -8,3 +8,9 @@ inventory/backups/
 
 # Dev logs
 *.log
+
+# Dev working docs (not for public repo)
+MISSION.md
+PROGRESS.md
+*.jfif
+*.log
